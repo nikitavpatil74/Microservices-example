@@ -1,0 +1,77 @@
+version: "3.7"
+
+services:
+  discovery-server:
+    container_name: discovery
+    build:
+      context: ./discovery-server
+      dockerfile: Dockerfile
+    ports:
+    - "8761:8761"
+  notification-service:
+    container_name: notification
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    environment:
+      - eureka.client.service-url.defaultZone=http://discovery-server:8761/eureka
+    depends_on:
+      - discovery-server
+    ports:
+    - "8082:8082"
+  customer-service:
+    container_name: customer
+    build:
+      context: ./customer-service
+      dockerfile: Dockerfile
+    environment:
+      - eureka.client.service-url.defaultZone=http://discovery-server:8761/eureka/
+      - DOCKER_MYSQL_HOST=app_db
+    depends_on:
+      - discovery-server
+      - mysql_db
+    links:
+      - mysql_db:app_db
+    ports:
+    - "8881:8881"
+  api-gateway:
+    container_name: api-gateway
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    environment:
+      - eureka.client.service-url.defaultZone=http://discovery-server:8761/eureka
+    depends_on:
+      - discovery-server
+    ports:
+    - "8180:8180"
+  inventory-service:
+    container_name: inventory-service
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    environment:
+      - eureka.client.service-url.defaultZone=http://discovery-server:8761/eureka
+      - DOCKER_MONGO_HOST=mongo_db
+    depends_on:
+      - discovery-server
+      - mongo_db
+    links:
+      - mongo_db:inventory_db
+    ports:
+    - "8083:8083"
+  mysql_db:
+    image: "mysql:8.0.22"
+    restart: always
+    ports:
+      - 3306:3306
+    environment:
+      MYSQL_DATABASE: customerm
+      MYSQL_USER: root
+      MYSQL_PASSWORD: 12345
+      MYSQL_ROOT_PASSWORD: 12345
+  mongo_db:
+    image: "mongo:4.2.10"
+    restart: always
+    ports:
+    - 27017:27017
