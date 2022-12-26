@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git:
+#          uri: https://github.com/MaximRom00/Microservices-example
+          uri: https://github.com/MaximRom00/Config-repo
+#          search-paths: config-repo
+          search-paths: config
+server:
+  port: 8888
