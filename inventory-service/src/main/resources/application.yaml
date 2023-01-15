@@ -1,11 +1,6 @@
-server:
-  port: 8083
 spring:
-  data:
-    mongodb:
-      uri: mongodb://${mongo.host}/inventory-service
   application:
     name: inventory-service
-mongo:
-  host: ${DOCKER_MONGO_HOST:localhost:27017}
-
+  cloud:
+    config:
+      uri: http://localhost:8888
