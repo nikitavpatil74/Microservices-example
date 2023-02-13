@@ -29,7 +29,7 @@ public class ProductController {
     }
 
     @GetMapping("/inventory")
-    public ResponseEntity<List<InventoryResponse>> isInStock(@RequestParam String nameProduct){
+    public ResponseEntity<InventoryResponse> isInStock(@RequestParam String nameProduct){
         return ResponseEntity.status(HttpStatus.OK).body(productService.isInStock(nameProduct));
     }
 }
