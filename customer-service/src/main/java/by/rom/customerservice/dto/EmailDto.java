@@ -9,4 +9,7 @@ public class EmailDto {
 
     private String email;
     private String body;
+    private String nameOfProduct;
+    private int price;
+
 }

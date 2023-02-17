@@ -25,6 +25,8 @@ public class Order extends AuditEntity{
 
     private int countOfProduct;
 
+    private int price;
+
     @ManyToOne
     @JsonBackReference
     private Customer customer;
