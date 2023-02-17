@@ -5,3 +5,7 @@
 /discovery-server/target/
 /inventory-service/target/
 /notification-service/target/
+.docker
+/.idea/
+/dbdata/
+/mysql_keycloak_data/
