@@ -1,6 +1,7 @@
 package by.rom.customerservice.service;
 
-import by.rom.customerservice.client.NotificationClient;
+import by.rom.customerservice.client.InventoryClient;
+import by.rom.customerservice.config.MessageConfig;
 import by.rom.customerservice.dto.CustomerDto;
 import by.rom.customerservice.dto.EmailDto;
 import by.rom.customerservice.dto.InventoryResponse;
@@ -12,13 +13,11 @@ import by.rom.customerservice.repository.CustomerRepository;
 import by.rom.customerservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -26,9 +25,9 @@ import java.util.Objects;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final NotificationClient notificationClient;
     private final CustomerRepository customerRepository;
-    private final WebClient.Builder webClient;
+    private final RabbitTemplate rabbitTemplate;
+    private final InventoryClient inventoryClient;
 
     @Transactional
     public Order createOrder(OrderDto orderDto) {
@@ -41,16 +40,18 @@ public class OrderService {
                 .customer(customer)
                 .nameProduct(orderDto.getNameProduct())
                 .countOfProduct(orderDto.getCountOfProduct())
-//                .customerId(orderDto.getCustomerId())
                 .build();
 
-        boolean hasProduct = findProduct(order.getNameProduct());
+        InventoryResponse response = findProduct(order.getNameProduct());
+
+        boolean hasProduct = response.isInStock();
 
         log.info("saving order to the DB: {}", orderDto);
 
         Order savedOrder;
 
         if (!hasProduct){
+            order.setPrice(response.getPrice());
             savedOrder  = orderRepository.save(order);
             log.info("saved order {}", savedOrder);
         }
@@ -58,7 +59,7 @@ public class OrderService {
             throw new IllegalArgumentException("Product isn't in stock, please try again later");
         }
 
-        sendEmail(customer);
+        sendEmail(savedOrder, customer);
 
         return savedOrder;
     }
@@ -72,19 +73,12 @@ public class OrderService {
             return list;
     }
 
-    private boolean findProduct(String nameProduct) {
-
-        InventoryResponse[] result = webClient.build().get()
-                .uri("http://inventory-service/api/product/inventory",
-                        uriBuilder -> uriBuilder.queryParam("nameProduct", nameProduct).build())
-                .retrieve()
-                .bodyToMono(InventoryResponse[].class)
-                .block();
+    private InventoryResponse findProduct(String nameProduct) {
+        InventoryResponse result = inventoryClient.sendRequest(nameProduct);
 
         log.info("result from inventory service: {}", result);
 
-        return Arrays.stream(Objects.requireNonNull(result))
-                .allMatch(InventoryResponse::isInStock);
+        return result;
     }
 
     private Customer findCustomer(OrderDto orderDto) {
@@ -92,14 +86,16 @@ public class OrderService {
                 .orElseThrow(() -> new NotFoundException("customer not found with id: " + orderDto.getCustomerId()));
     }
 
-    private void sendEmail(Customer customer) {
+    private void sendEmail(Order savedOrder, Customer customer) {
         EmailDto emailDto = EmailDto.builder()
                 .email(customer.getEmail())
+                .nameOfProduct(savedOrder.getNameProduct())
+                .price(savedOrder.getPrice())
                 .body(String.format("Thanks %s for your order.", customer.getName()))
                 .build();
+
         log.info("sending email {}" , emailDto);
-        notificationClient.sendEmail(emailDto);
+
+        rabbitTemplate.convertAndSend(MessageConfig.EXCHANGE, MessageConfig.ROUTING_KEY, emailDto);
     }
-
-
 }
